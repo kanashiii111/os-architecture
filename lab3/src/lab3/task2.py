@@ -1,5 +1,4 @@
 """Задание 2: писатель и два читателя (приоритет писателя), алгоритм Петерсона."""
-import queue
 import time
 
 from .worker import Worker
@@ -43,7 +42,6 @@ class Task2:
     RECORD_CELLS = 5  # запись из нескольких ячеек; писатель заполняет их по одной, чтобы был виден разрыв
 
     def __init__(self):
-        self.log = queue.Queue()
         self.record = [0] * self.RECORD_CELLS  # общие данные
         # Переменные состояния, их меняют только под self.lock:
         self.active_readers = 0  # сколько читателей сейчас читают
@@ -76,7 +74,6 @@ class Task2:
             self.lock.lock(WRITER_ID)
             self.writing = False
             self.lock.unlock(WRITER_ID)
-            self.log.put(f"Писатель: записал {new_value}")
 
     def _wait_until_can_write(self, worker):
         """Ждёт, пока все читатели выйдут, и занимает данные. False — поток остановили."""
@@ -112,9 +109,6 @@ class Task2:
 
             if len(set(values_read)) != 1:  # ячейки разные — прочитали полузаписанные данные
                 self.errors += 1
-                self.log.put(f"Читатель {reader_id}: ОШИБКА, прочитано {values_read}")
-            else:
-                self.log.put(f"Читатель {reader_id}: прочитал {values_read[0]}")
             worker.state = "обрабатывает"
             worker.sleep()
 

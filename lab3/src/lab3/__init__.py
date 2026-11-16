@@ -8,7 +8,7 @@ from .tab2 import tab2
 def main() -> None:
     root = tk.Tk()
     root.title("Лабораторная 3 — синхронизация потоков (вариант 34)")
-    root.geometry("820x560")
+    root.geometry("900x720")
     notebook = ttk.Notebook(root)
     notebook.pack(fill="both", expand=True)
     tab1(notebook)

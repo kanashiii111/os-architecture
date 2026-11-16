@@ -1,6 +1,5 @@
 """Задание 1: поставщик и потребитель через файл, синхронизация семафорами."""
 import math
-import queue
 import threading
 from pathlib import Path
 
@@ -23,10 +22,9 @@ class Task1:
 
     def __init__(self, path: str | Path = "task1_buffer.txt"):
         self.path = Path(path)
-        self.log = queue.Queue()
         self.reset()
-        self.producer = Worker("Поставщик", self._produce)
-        self.consumer = Worker("Потребитель", self._consume)
+        self.producer = Worker("Поток 1: считает Y=(ln x)/3 и пишет в файл", self._produce)
+        self.consumer = Worker("Поток 2: читает из файла и суммирует в Z", self._consume)
 
     def reset(self):
         self.path.write_text("", encoding="utf-8")
@@ -63,7 +61,6 @@ class Task1:
             self.file_access.acquire()
             with self.path.open("a", encoding="utf-8") as file:
                 file.write(f"{y:.6f}\n")
-            self.log.put(f"Поставщик: x={self.next_x}, Y={y:.6f} записано в файл")
             self.next_x += 1
             self.file_access.release()
             self.filled_slots.release()
@@ -80,5 +77,4 @@ class Task1:
 
             worker.state = "суммирует"
             self.z += y
-            self.log.put(f"Потребитель: прочитано {y:.6f}, Z={self.z:.6f}")
             worker.sleep()

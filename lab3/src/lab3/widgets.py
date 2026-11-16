@@ -1,15 +1,18 @@
-"""Общие элементы интерфейса: панель потока и лог."""
+"""Общие элементы интерфейса: текст задания, панель потока, общее управление."""
 import tkinter as tk
 from tkinter import ttk
 
-LOG_MAX_LINES = 1000  # при задержке 0 мс потоки пишут ~100 тыс. сообщений/с — показываем только хвост
+
+def task_text(parent, text, columns):
+    label = ttk.Label(parent, text=text, wraplength=860, justify="left", font=("Segoe UI", 10, "bold"))
+    label.grid(row=0, column=0, columnspan=columns, sticky="w", padx=4, pady=(0, 6))
 
 
-def worker_panel(parent, worker, column):
+def worker_panel(parent, worker, row, column):
     """Панель потока: состояние, ползунок задержки, «Запуск» / «Пауза» / «Останов».
     Возвращает функцию, которая обновляет надпись состояния."""
     frame = ttk.LabelFrame(parent, text=worker.name, padding=6)
-    frame.grid(row=1, column=column, sticky="nsew", padx=4, pady=4)
+    frame.grid(row=row, column=column, sticky="nsew", padx=4, pady=4)
     state_label = ttk.Label(frame, width=24)
     state_label.pack(anchor="w")
 
@@ -22,40 +25,38 @@ def worker_panel(parent, worker, column):
     buttons = ttk.Frame(frame)
     buttons.pack(pady=(4, 0))
     for text, action in (("Запуск", worker.start), ("Пауза", worker.pause), ("Останов", worker.stop)):
-        ttk.Button(buttons, text=text, command=action).pack(side="left", padx=2)
+        ttk.Button(buttons, text=text, command=action, width=8).pack(side="left", padx=2)
 
     def update_state():
-        state_label.config(text="Состояние: " + ("пауза" if worker.paused() else worker.state))
+        state_label.config(text="Состояние: " + state_text(worker))
 
     return update_state
 
 
-class LogList(tk.Listbox):
-    """Список сообщений лога, который помнит, сколько их пришло за всё время (для нумерации)."""
-
-    def __init__(self, parent):
-        super().__init__(parent, height=12)
-        self.total_messages = 0
+def state_text(worker):
+    return "пауза" if worker.paused() else worker.state
 
 
-def log_box(parent, columns):
-    log_list = LogList(parent)
-    log_list.grid(row=2, column=0, columnspan=columns, sticky="nsew", padx=4, pady=4)
-    parent.rowconfigure(2, weight=1)
-    return log_list
+def group_controls(parent, workers, row, columns):
+    """Общее управление всеми потоками вкладки и выход из приложения."""
+    frame = ttk.LabelFrame(parent, text="Все потоки", padding=6)
+    frame.grid(row=row, column=0, columnspan=columns, sticky="ew", padx=4, pady=4)
 
+    def start_all():
+        for worker in workers:
+            worker.start()
 
-def show_new_log_messages(messages_queue, log_list: LogList):
-    """Переносит новые сообщения из очереди потоков в лог, с номерами."""
-    new_count = messages_queue.qsize()  # только то, что уже есть, иначе при быстрых потоках цикл не кончится
-    new_messages = [messages_queue.get() for _ in range(new_count)]
-    shown_messages = new_messages[-LOG_MAX_LINES:]
-    first_number = log_list.total_messages + new_count - len(shown_messages) + 1
-    log_list.total_messages += new_count
+    def pause_all():
+        # если хоть один работает — ставим всех на паузу, иначе снимаем паузу со всех
+        running = [worker for worker in workers if worker.alive()]
+        pause = not all(worker.paused() for worker in running)
+        for worker in running:
+            worker.set_paused(pause)
 
-    for number, message in enumerate(shown_messages, start=first_number):
-        log_list.insert("end", f"{number}. {message}")
-    if log_list.size() > LOG_MAX_LINES:
-        log_list.delete(0, log_list.size() - LOG_MAX_LINES - 1)
-    if new_count:
-        log_list.see("end")
+    def stop_all():
+        for worker in workers:
+            worker.stop()
+
+    for text, action in (("Запустить все", start_all), ("Пауза всех", pause_all), ("Остановить все", stop_all)):
+        ttk.Button(frame, text=text, command=action).pack(side="left", padx=2)
+    ttk.Button(frame, text="Выход", command=parent.winfo_toplevel().destroy).pack(side="right", padx=2)

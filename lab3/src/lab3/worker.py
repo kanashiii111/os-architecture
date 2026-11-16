@@ -28,6 +28,12 @@ class Worker:
             self.thread = threading.Thread(target=self._thread_main, daemon=True)
             self.thread.start()
 
+    def set_paused(self, paused):
+        if paused:
+            self._is_running.clear()
+        else:
+            self._is_running.set()
+
     def pause(self):
         if self._is_running.is_set():
             self._is_running.clear()
