@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from .task2 import Task2
-from .widgets import group_controls, state_text, task_text, worker_panel
+from .widgets import PAUSE_COLOR, group_controls, task_text, worker_panel
 
 TASK_TEXT = ("Задание 2. Задачу о писателе и читателе решить с помощью алгоритма Петерсона "
              "(два читателя, приоритет писателя).")
@@ -29,11 +29,13 @@ def rounded_box(canvas, left, top, right, bottom, radius=22):
 
 
 def process_box(canvas, center_x, center_y, title):
-    """Блок процесса: рамка, название, строка состояния. Возвращает (рамка, текст состояния)."""
+    """Блок процесса: рамка, название, строка состояния и значок паузы над правым углом."""
     box = rounded_box(canvas, center_x - 110, center_y - 32, center_x + 110, center_y + 32)
     canvas.create_text(center_x, center_y - 10, text=title, font=("Times New Roman", 14))
     state = canvas.create_text(center_x, center_y + 14, font=("Segoe UI", 9))
-    return box, state
+    pause_badge = canvas.create_text(center_x + 108, center_y - 34, anchor="se", text="⏸ пауза",
+                                     fill=PAUSE_COLOR, font=("Segoe UI", 9, "bold"), state="hidden")
+    return box, state, pause_badge
 
 
 def tab2(notebook):
@@ -46,9 +48,9 @@ def tab2(notebook):
     canvas = tk.Canvas(tab, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg="white", highlightthickness=0)
     canvas.grid(row=1, column=0, columnspan=3, padx=4)
 
-    writer_box, writer_state = process_box(canvas, 130, 125, "Процесс-писатель")
-    reader1_box, reader1_state = process_box(canvas, 730, 55, "Процесс-читатель 1")
-    reader2_box, reader2_state = process_box(canvas, 730, 195, "Процесс-читатель 2")
+    writer_items = process_box(canvas, 130, 125, "Процесс-писатель")
+    reader1_items = process_box(canvas, 730, 55, "Процесс-читатель 1")
+    reader2_items = process_box(canvas, 730, 195, "Процесс-читатель 2")
 
     canvas.create_text((MEMORY_LEFT + MEMORY_RIGHT) / 2, MEMORY_TOP - 22, text="Общая область памяти",
                        font=("Times New Roman", 14, "bold"))
@@ -72,24 +74,26 @@ def tab2(notebook):
     for column in range(3):
         tab.columnconfigure(column, weight=1)
 
-    def show_process(worker, box, state, arrow, active_state, active_color, arrow_color):
-        if worker.paused():
-            fill = IDLE_COLOR
-        elif worker.state == active_state:
+    def show_process(worker, items, arrow, active_state, active_color, arrow_color):
+        box, state, pause_badge = items
+        if worker.state == active_state:
             fill = active_color
         elif worker.state == "ждёт доступа":
             fill = WAITING_COLOR
         else:
             fill = IDLE_COLOR
         is_active = worker.state == active_state
-        canvas.itemconfig(box, fill=fill)
-        canvas.itemconfig(state, text=state_text(worker))
+        paused = worker.paused()
+        # на паузе цвет и состояние остаются (поток замер там, где был), рамка — пунктир + значок
+        canvas.itemconfig(box, fill=fill, dash=(6, 4) if paused else (), outline=PAUSE_COLOR if paused else "black")
+        canvas.itemconfig(state, text=worker.state)
+        canvas.itemconfig(pause_badge, state="normal" if paused else "hidden")
         canvas.itemconfig(arrow, fill=arrow_color if is_active else ARROW_IDLE, width=4 if is_active else 2)
 
     def refresh():
-        show_process(task.writer, writer_box, writer_state, writer_arrow, "пишет", WRITING_COLOR, ARROW_WRITE)
-        show_process(task.reader1, reader1_box, reader1_state, reader1_arrow, "читает", READING_COLOR, ARROW_READ)
-        show_process(task.reader2, reader2_box, reader2_state, reader2_arrow, "читает", READING_COLOR, ARROW_READ)
+        show_process(task.writer, writer_items, writer_arrow, "пишет", WRITING_COLOR, ARROW_WRITE)
+        show_process(task.reader1, reader1_items, reader1_arrow, "читает", READING_COLOR, ARROW_READ)
+        show_process(task.reader2, reader2_items, reader2_arrow, "читает", READING_COLOR, ARROW_READ)
         if task.writing:
             memory_color = WRITING_COLOR
         elif task.active_readers:
@@ -99,8 +103,8 @@ def tab2(notebook):
         canvas.itemconfig(memory_box, fill=memory_color)
         for cell, value in zip(memory_cells, task.record):
             canvas.itemconfig(cell, text=value)
-        canvas.itemconfig(info_text, text=f"читают: {task.active_readers}   писателей ждёт: "
-                                          f"{task.writers_waiting}   ошибок чтения: {task.errors}")
+        canvas.itemconfig(info_text, text=f"читают: {task.active_readers}   писателей ждёт: ")
+                                          # f"{task.writers_waiting}   ошибок чтения: {task.errors}")
         for update_state in state_updaters:
             update_state()
         tab.after(100, refresh)

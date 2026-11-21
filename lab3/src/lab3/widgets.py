@@ -2,6 +2,8 @@
 import tkinter as tk
 from tkinter import ttk
 
+PAUSE_COLOR = "#e65100"  # индикатор паузы — отдельно от цвета состояния
+
 
 def task_text(parent, text, columns):
     label = ttk.Label(parent, text=text, wraplength=860, justify="left", font=("Segoe UI", 10, "bold"))
@@ -13,8 +15,11 @@ def worker_panel(parent, worker, row, column):
     Возвращает функцию, которая обновляет надпись состояния."""
     frame = ttk.LabelFrame(parent, text=worker.name, padding=6)
     frame.grid(row=row, column=column, sticky="nsew", padx=4, pady=4)
-    state_label = ttk.Label(frame, width=24)
-    state_label.pack(anchor="w")
+    state_row = ttk.Frame(frame)
+    state_row.pack(fill="x")
+    state_label = ttk.Label(state_row)
+    state_label.pack(side="left")
+    pause_label = tk.Label(state_row, text="⏸ пауза", fg="white", bg=PAUSE_COLOR, padx=4)
 
     ttk.Label(frame, text="Задержка, мс:").pack(anchor="w")
     delay_slider = tk.Scale(frame, from_=0, to=3000, resolution=50, orient="horizontal", length=200,
@@ -24,17 +29,24 @@ def worker_panel(parent, worker, row, column):
 
     buttons = ttk.Frame(frame)
     buttons.pack(pady=(4, 0))
-    for text, action in (("Запуск", worker.start), ("Пауза", worker.pause), ("Останов", worker.stop)):
-        ttk.Button(buttons, text=text, command=action, width=8).pack(side="left", padx=2)
+    start_button = ttk.Button(buttons, text="Запуск", command=worker.start, width=8)
+    start_button.pack(side="left", padx=2)
+    pause_button = ttk.Button(buttons, text="Пауза", command=worker.pause, width=12)
+    pause_button.pack(side="left", padx=2)
+    ttk.Button(buttons, text="Останов", command=worker.stop, width=8).pack(side="left", padx=2)
 
     def update_state():
-        state_label.config(text="Состояние: " + state_text(worker))
+        state_label.config(text="Состояние: " + worker.state)
+        # «Запуск» доступен, только пока поток не работает (снова — после останова или завершения)
+        start_button.state(["disabled"] if worker.alive() else ["!disabled"])
+        paused = worker.paused()
+        pause_button.config(text="Продолжить" if paused else "Пауза")
+        if paused:
+            pause_label.pack(side="right")
+        else:
+            pause_label.pack_forget()
 
     return update_state
-
-
-def state_text(worker):
-    return "пауза" if worker.paused() else worker.state
 
 
 def group_controls(parent, workers, row, columns):
